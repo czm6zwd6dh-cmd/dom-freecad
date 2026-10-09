@@ -1,0 +1,9 @@
+{
+  "version": "1.1.4",
+  "platform": "linux-x86_64",
+  "asset_name": "FreeCAD_1.1.4-Linux-x86_64-py311.AppImage",
+  "url": "https://github.com/FreeCAD/FreeCAD/releases/download/1.1.4/FreeCAD_1.1.4-Linux-x86_64-py311.AppImage",
+  "sha256": "f6dc6ba676e5ac96a565ebc8d657232f94c6158e85b4352141bd1a46f6b43434",
+  "size_bytes": 820812280,
+  "source": "https://github.com/FreeCAD/FreeCAD/releases/tag/1.1.4"
+}
