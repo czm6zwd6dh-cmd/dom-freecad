@@ -46,8 +46,25 @@ def export_page(doc, destination):
     destination.mkdir(parents=True, exist_ok=True)
     page = doc.getObject('A3Sheet')
     require(page is not None, 'Missing native drawing page')
-    doc.recompute()
+    # Restored TechDraw views may still expose their cached drawing. Mark the
+    # native views dirty, recompute, and process the queued GUI/HLR completion
+    # before export. The independent PDF test remains the acceptance condition.
+    from PySide import QtCore
+    page.KeepUpdated = True
     Gui.activeDocument().getObject(page.Name).show()
+    for view in page.Views:
+        view.touch()
+    page.touch()
+    doc.recompute()
+    loop = QtCore.QEventLoop()
+    QtCore.QTimer.singleShot(1500, loop.quit)
+    loop.exec_()
+    for view in page.Views:
+        view.requestPaint()
+    Gui.updateGui()
+    settle = QtCore.QEventLoop()
+    QtCore.QTimer.singleShot(500, settle.quit)
+    settle.exec_()
     Gui.updateGui()
     TechDrawGui.exportPageAsPdf(page, str(destination / 'synthetic-page.pdf'))
     TechDrawGui.exportPageAsSvg(page, str(destination / 'synthetic-page.svg'))

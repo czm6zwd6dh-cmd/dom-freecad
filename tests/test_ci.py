@@ -87,7 +87,7 @@ class VectorCheckTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.pdf = Path(self.temp.name) / 'test.pdf'
 
-    def create(self, width=50, paper_width=420, missing=False, offset=0):
+    def create(self, width=50, paper_width=420, missing=False, offset=0, separate=False, lost_edge=False, duplicate=False):
         scale = 72 / 25.4
         doc = fitz.open()
         page = doc.new_page(width=paper_width * scale, height=297 * scale)
@@ -97,10 +97,19 @@ class VectorCheckTests(unittest.TestCase):
         for x, y, w, h in targets:
             points = [(x, y), (x+w, y), (x+w, y+h), (x, y+h), (x, y)]
             shape = page.new_shape()
-            for a, b in zip(points, points[1:]):
+            for index, (a, b) in enumerate(zip(points, points[1:])):
+                if lost_edge and x == 145 + offset and index == 2:
+                    continue
                 shape.draw_line(fitz.Point(a[0]*scale, a[1]*scale), fitz.Point(b[0]*scale, b[1]*scale))
-            shape.finish(closePath=False)
-            shape.commit()
+                if separate:
+                    shape.finish(closePath=False)
+                    shape.commit()
+                    shape = page.new_shape()
+            if not separate:
+                shape.finish(closePath=False)
+                shape.commit()
+        if duplicate:
+            page.draw_line(fitz.Point(145*scale, 124*scale), fitz.Point((145+width)*scale, 124*scale))
         doc.save(self.pdf)
         doc.close()
 
@@ -129,6 +138,29 @@ class VectorCheckTests(unittest.TestCase):
 
     def test_wrong_paper_rejected(self):
         self.create(paper_width=400)
+        with self.assertRaises(ValueError):
+            pdf_measurements(self.pdf, 1000)
+
+    def test_separate_paths_supported(self):
+        self.create(separate=True)
+        pdf_measurements(self.pdf, 1000)
+
+    def test_separate_mutated_paths_supported(self):
+        self.create(width=60, separate=True)
+        pdf_measurements(self.pdf, 1200)
+
+    def test_stale_separate_mutation_rejected(self):
+        self.create(width=50, separate=True)
+        with self.assertRaises(ValueError):
+            pdf_measurements(self.pdf, 1200)
+
+    def test_missing_single_side_rejected(self):
+        self.create(separate=True, lost_edge=True)
+        with self.assertRaises(ValueError):
+            pdf_measurements(self.pdf, 1000)
+
+    def test_duplicate_side_rejected(self):
+        self.create(separate=True, duplicate=True)
         with self.assertRaises(ValueError):
             pdf_measurements(self.pdf, 1000)
 

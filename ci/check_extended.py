@@ -29,34 +29,52 @@ def pdf_measurements(path, opening_width_mm):
         page = document[0]
         require(abs(page.rect.width * PT_TO_MM - 420) <= PAPER_TOLERANCE_MM and
                 abs(page.rect.height * PT_TO_MM - 297) <= PAPER_TOLERANCE_MM, 'Wrong paper size')
-        rectangles = []
+        # PDF writers may group a rectangle as re/qu/four lines, or emit each
+        # edge in a separate path after a document restore. Measure the same
+        # four independent edges rather than relying on path grouping.
+        segments = []
         for drawing in page.get_drawings():
+            # Fill paths can duplicate boundaries; only actual stroked linework
+            # establishes drawing-edge presence and multiplicity.
+            if 's' not in drawing['type']:
+                continue
             items = drawing['items']
+            points = None
             if len(items) == 1 and items[0][0] == 're':
-                pass  # MuPDF may canonicalize a closed four-edge path to a rectangle.
+                r = items[0][1]
+                points = [r.tl, r.tr, r.br, r.bl]
             elif len(items) == 1 and items[0][0] == 'qu':
-                points = {(round(p.x, 2), round(p.y, 2)) for p in items[0][1]}
-                xs, ys = {p[0] for p in points}, {p[1] for p in points}
-                if len(xs) != 2 or len(ys) != 2 or points != {(x, y) for x in xs for y in ys}:
-                    continue
-            elif len(items) == 4 and all(item[0] == 'l' for item in items):
-                if not all(abs(item[1].x - item[2].x) < 0.02 or abs(item[1].y - item[2].y) < 0.02 for item in items):
-                    continue
-                vertices = [(round(item[k].x, 2), round(item[k].y, 2)) for item in items for k in (1, 2)]
-                if len(set(vertices)) != 4 or any(vertices.count(v) != 2 for v in set(vertices)):
-                    continue
+                quad = items[0][1]
+                points = [quad.ul, quad.ur, quad.lr, quad.ll]
+            if points is not None:
+                edges = list(zip(points, points[1:] + points[:1]))
+            elif len(items) in (1, 4) and all(item[0] == 'l' for item in items):
+                edges = [(item[1], item[2]) for item in items]
             else:
                 continue
-            r = drawing['rect']
-            rectangles.append([r.x0 * PT_TO_MM, r.y0 * PT_TO_MM, r.width * PT_TO_MM, r.height * PT_TO_MM])
+            for a, b in edges:
+                if abs(a.x - b.x) < 0.02 or abs(a.y - b.y) < 0.02:
+                    segments.append([a.x * PT_TO_MM, a.y * PT_TO_MM,
+                                     b.x * PT_TO_MM, b.y * PT_TO_MM])
         expected = {'elevation': [70, 79, 200, 150],
                     'window': [145, 124, opening_width_mm / 20, 60],
                     'top': [312, 74, 80, 6]}
         measured = {}
-        for name, target in expected.items():
-            matches = [r for r in rectangles if all(abs(a - b) <= PAPER_TOLERANCE_MM for a, b in zip(r, target))]
-            require(len(matches) == 1, 'Missing, duplicated, or incorrectly scaled vector rectangle: ' + name)
-            measured[name] = matches[0]
+        def close(segment, target):
+            return (all(abs(a - b) <= PAPER_TOLERANCE_MM for a, b in zip(segment, target)) or
+                    all(abs(a - b) <= PAPER_TOLERANCE_MM for a, b in
+                        zip(segment[2:] + segment[:2], target)))
+        for name, (x, y, w, h) in expected.items():
+            sides = [[x, y, x+w, y], [x+w, y, x+w, y+h],
+                     [x+w, y+h, x, y+h], [x, y+h, x, y]]
+            selected = []
+            for side in sides:
+                matches = [segment for segment in segments if close(segment, side)]
+                require(len(matches) == 1, 'Missing, duplicated, stale or incorrectly scaled edge: ' + name)
+                selected.append(matches[0])
+            xs = [v for edge in selected for v in (edge[0], edge[2])]
+            ys = [v for edge in selected for v in (edge[1], edge[3])]
+            measured[name] = [min(xs), min(ys), max(xs)-min(xs), max(ys)-min(ys)]
         page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False).save(str(Path(path).with_name('preview.png')))
         return {'paper_mm': [page.rect.width * PT_TO_MM, page.rect.height * PT_TO_MM],
                 'rectangles_mm': measured, 'paper_tolerance_mm': PAPER_TOLERANCE_MM,
