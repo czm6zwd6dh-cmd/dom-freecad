@@ -1,8 +1,9 @@
-# FreeCAD GUI macro. Uses SYNTHETIC rectangles; never reads owner project files.
+# Isolated FreeCAD GUI entry point. Only reviewed synthetic phases are accepted.
+import datetime
 import json
-import math
 import os
 from pathlib import Path
+import sys
 import traceback
 
 try:
@@ -13,108 +14,44 @@ except ImportError:
     except ImportError:
         from PySide2 import QtCore
 
-ROOT = Path(os.environ["DOM_REPO_ROOT"]).resolve()
-OUT = ROOT / "build/smoke"
+ROOT = Path(os.environ['DOM_REPO_ROOT']).resolve()
+PHASE = os.environ['DOM_PHASE']
+if PHASE not in {'build', 'cold-reopen', 'mutate', 'native-tools', 'restore-reopen'}:
+    raise ValueError('Unapproved phase')
+OUT = ROOT / 'build/smoke'
 OUT.mkdir(parents=True, exist_ok=True)
+TARGET = OUT / ('report.json' if PHASE == 'build' else PHASE + '.json')
 
 
-def run_test():
-    status = 1
-    document = None
-    report = {"status": "FAILED", "source": "SYNTHETIC_ONLY",
-              "scope": "One test wall and A3 top/elevation; NOT FOR CONSTRUCTION"}
+def execute():
+    code = 1
+    report = {'status': 'FAILED', 'source': 'SYNTHETIC_ONLY', 'phase': PHASE,
+              'pid': os.getpid(), 'invocation_id': os.environ['DOM_INVOCATION_ID'],
+              'head_sha': os.environ['GITHUB_SHA'], 'construction_ready': False,
+              'timestamp_utc': datetime.datetime.now(datetime.timezone.utc).isoformat()}
     try:
         import FreeCAD as App
-        import FreeCADGui as Gui
-        import Part
-        import TechDrawGui
-
-        version = ".".join(App.Version()[:3])
-        report["version"] = version
-        if version != "1.1.4":
-            raise RuntimeError("Pinned FreeCAD 1.1.4 expected: " + version)
-
-        document = App.newDocument("SyntheticWall")
-        base = document.addObject("Part::Box", "WallBase")
-        base.Length, base.Width, base.Height = 4000, 300, 3000
-        opening = document.addObject("Part::Box", "DoorOpening")
-        opening.Length, opening.Width, opening.Height = 1000, 500, 1200
-        opening.Placement.Base = App.Vector(1500, -100, 900)
-        wall = document.addObject("Part::Cut", "Wall")
-        wall.Base, wall.Tool = base, opening
-        wall.addProperty("App::PropertyString", "DataClass", "Provenance")
-        wall.DataClass = "SYNTHETIC_ONLY"
-
-        page = document.addObject("TechDraw::DrawPage", "A3Sheet")
-        template = document.addObject("TechDraw::DrawSVGTemplate", "PageTemplate")
-        template.Template = str(ROOT / "ci/a3-landscape.svg")
-        page.Template = template
-
-        for name, direction, x, y, scale in [
-            ("Elevation", (0, -1, 0), 170, 143, 0.05),
-            ("TopProjection", (0, 0, 1), 352, 220, 0.02)
-        ]:
-            view = document.addObject("TechDraw::DrawViewPart", name)
-            view.Source = [wall]
-            page.addView(view)
-            view.Direction = App.Vector(*direction)
-            view.ScaleType = "Custom"
-            view.Scale = scale
-            view.X, view.Y = x, y
-
-        document.recompute()
-        expected = 4000 * 300 * 3000 - 1000 * 300 * 1200
-        actual = wall.Shape.Volume
-        if not wall.Shape.isValid() or len(wall.Shape.Solids) != 1:
-            raise RuntimeError("Invalid native CAD wall solid")
-        if not math.isclose(actual, expected, rel_tol=0, abs_tol=0.01):
-            raise RuntimeError(f"Incorrect volume: {actual} expected {expected}")
-        if wall.Shape.common(opening.Shape).Volume > 0.01:
-            raise RuntimeError("Synthetic opening remains filled")
-        for name in ("Elevation", "TopProjection"):
-            if list(document.getObject(name).Source) != [wall]:
-                raise RuntimeError("Broken TechDraw linked source")
-
-        base.ViewObject.Visibility = False
-        opening.ViewObject.Visibility = False
-        model = OUT / "synthetic-wall.FCStd"
-        document.saveAs(str(model))
-        Gui.activeDocument().activeView().viewAxonometric()
-        Gui.activeDocument().activeView().fitAll()
-        Gui.activeDocument().getObject(page.Name).show()
-        Gui.updateGui()
-        TechDrawGui.exportPageAsPdf(page, str(OUT / "synthetic-page.pdf"))
-        TechDrawGui.exportPageAsSvg(page, str(OUT / "synthetic-page.svg"))
-        Part.export([wall], str(OUT / "synthetic-wall.step"))
-        App.closeDocument(document.Name)
-        document = None
-
-        document = App.openDocument(str(model))
-        if document.getObject("Wall") is None or document.getObject("A3Sheet") is None:
-            raise RuntimeError("Reopening original FCStd lost geometry or drawing")
-        if not math.isclose(document.getObject("Wall").Shape.Volume, expected, rel_tol=0, abs_tol=0.01):
-            raise RuntimeError("Reopened wall volume mismatch")
-        if list(document.getObject("Elevation").Source) != [document.getObject("Wall")]:
-            raise RuntimeError("TechDraw source link lost on reopen")
-
-        report.update(status="PASS", wall_net_volume_mm3=actual,
-                      expected_volume_mm3=expected,
-                      exports=["FCStd", "STEP", "PDF", "SVG"],
-                      drawing_scale_parity="NOT_VERIFIED",
-                      construction_ready=False)
-        status = 0
+        version = '.'.join(App.Version()[:3])
+        report['version'] = version
+        if version != '1.1.4':
+            raise ValueError('Pinned FreeCAD 1.1.4 required')
+        sys.path.insert(0, str(ROOT / 'ci'))
+        import native_suite
+        report.update(native_suite.run(PHASE))
+        report['status'] = 'PASS'
+        code = 0
     except Exception:
-        report["traceback"] = traceback.format_exc()
+        report['traceback'] = traceback.format_exc()
     finally:
-        if document is not None:
-            try:
-                import FreeCAD as App
-                App.closeDocument(document.Name)
-            except Exception:
-                pass
-        (OUT / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-        print("DOM_FREECAD_NATIVE_REPORT", json.dumps(report))
-        QtCore.QCoreApplication.exit(status)
+        try:
+            import FreeCAD as App
+            for name in list(App.listDocuments()):
+                App.closeDocument(name)
+        except Exception:
+            pass
+        TARGET.write_text(json.dumps(report, indent=2), encoding='utf-8')
+        print('DOM_NATIVE_REPORT', json.dumps(report))
+        QtCore.QCoreApplication.exit(code)
 
 
-QtCore.QTimer.singleShot(0, run_test)
+QtCore.QTimer.singleShot(0, execute)

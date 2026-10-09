@@ -37,32 +37,37 @@ jobs:
             libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 \
             libsm6 libice6 libxrender1 libfontconfig1 fonts-dejavu-core
           python -m pip install 'PyMuPDF==1.26.7'
+      - name: Verify updated skill subset and run regression tests
+        run: |
+          python ci/verify_vendor.py
+          python ci/run_unit_tests.py
       - name: Download and SHA-256-verify FreeCAD official binary
         run: python ci/install_freecad.py
       - name: Build native synthetic wall and export A3
-        env:
-          DOM_REPO_ROOT: ${{ github.workspace }}
-          QT_QPA_PLATFORM: xcb
-          QT_OPENGL: software
-          LIBGL_ALWAYS_SOFTWARE: '1'
-        run: |
-          mkdir -p build/smoke
-          xvfb-run -a -s '-screen 0 1600x1200x24' \
-            timeout --signal=TERM --kill-after=10s 240 \
-            .runtime/freecad/squashfs-root/AppRun \
-              --user-cfg "$RUNNER_TEMP/dom-freecad-user.cfg" \
-              --system-cfg "$RUNNER_TEMP/dom-freecad-system.cfg" \
-              "$GITHUB_WORKSPACE/ci/smoke.FCMacro" \
-            > build/smoke/freecad.log 2>&1
-          test -s build/smoke/report.json
+        run: python ci/run_native.py build
       - name: Independently validate CAD files and PDF geometry
         run: python ci/check_smoke.py build/smoke
+      - name: Qualify updated skill native layer and void tools
+        run: python ci/run_native.py native-tools
+      - name: Reopen saved model in a separate FreeCAD process
+        run: python ci/run_native.py cold-reopen
+      - name: Change only a disposable model copy and reexport
+        run: python ci/run_native.py mutate
+      - name: Verify synthetic closed-release backup and restore
+        run: python ci/snapshot_synthetic.py
+      - name: Reopen restored model in a separate FreeCAD process
+        run: python ci/run_native.py restore-reopen
+      - name: Package reviewed public source snapshot
+        run: git archive --format=zip --output=build/smoke/public-source.zip "$GITHUB_SHA"
+      - name: Verify process isolation, unchanged source and PDF control spans
+        run: python ci/check_extended.py build/smoke --expected-sha "$GITHUB_SHA"
       - name: Explain test scope
         if: success()
         run: |
-          echo '### Synthetic FreeCAD test succeeded' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Verified: one synthetic wall with door opening, FCStd reopen, STEP, A3 PDF and SVG.' >> "$GITHUB_STEP_SUMMARY"
-          echo '**Not verified:** R1, dimension associativity, complete plans, SPDS compliance, or construction suitability.' >> "$GITHUB_STEP_SUMMARY"
+          echo '### Synthetic FreeCAD and skill integration passed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Native wall/window, layer/void modules, cold reopen, disposable mutation, backup/restore, PDF control spans.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'See qualification.json and unit-tests.json. The cloud subset is not the full host skill.' >> "$GITHUB_STEP_SUMMARY"
+          echo '**Not qualified:** real R1, linked dimensions/sections, DXF, full SPDS, private route or construction.' >> "$GITHUB_STEP_SUMMARY"
       - name: Save ONLY synthetic CAD evidence and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

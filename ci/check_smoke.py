@@ -1,30 +1,22 @@
 #!/usr/bin/env python3
-"""Check synthetic FreeCAD reports and exports; NOT an SPDS or real-house check."""
+"""Check the initial synthetic wall export; extended phases are checked separately."""
 import json
 import math
 from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
-import fitz
+from check_extended import pdf_measurements, require
 
-root = Path(sys.argv[1] if len(sys.argv) > 1 else "build/smoke")
-report = json.loads((root / "report.json").read_text(encoding="utf-8"))
-assert report["status"] == "PASS", report
-assert report["version"] == "1.1.4", report
+root = Path(sys.argv[1] if len(sys.argv) > 1 else 'build/smoke')
+report = json.loads((root / 'report.json').read_text(encoding='utf-8'))
+require(report['status'] == 'PASS' and report['version'] == '1.1.4', 'Native build failed')
+require(report['source'] == 'SYNTHETIC_ONLY' and report['construction_ready'] is False, 'Unexpected classification')
 expected = 4000 * 300 * 3000 - 1000 * 300 * 1200
-assert math.isclose(float(report["wall_net_volume_mm3"]), expected, abs_tol=0.01)
-assert report["source"] == "SYNTHETIC_ONLY"
-for name in ("synthetic-wall.FCStd", "synthetic-wall.step", "synthetic-page.pdf", "synthetic-page.svg"):
-    assert (root / name).is_file(), f"Missing {name}"
-    assert (root / name).stat().st_size > 100, f"Empty {name}"
-assert ET.parse(root / "synthetic-page.svg").getroot().tag.endswith("svg")
-with fitz.open(root / "synthetic-page.pdf") as document:
-    assert len(document) == 1
-    page = document[0]
-    width, height = (page.rect.width, page.rect.height)
-    assert abs(width - 420 * 72 / 25.4) < 2, (width, height)
-    assert abs(height - 297 * 72 / 25.4) < 2, (width, height)
-    assert len(page.get_drawings()) > 0, "PDF contains no vector linework"
-    page.get_pixmap(matrix=fitz.Matrix(1.25, 1.25), alpha=False).save(str(root / "preview.png"))
-print("SYNTHETIC CAD PASS: wall geometry, FCStd, STEP, A3 vector PDF, SVG")
-print("Review preview.png manually; drawing completeness, scale fidelity and SPDS NOT proven.")
+require(math.isclose(float(report['wall_net_volume_mm3']), expected, rel_tol=0, abs_tol=0.01), 'Incorrect volume')
+for name in ('synthetic-wall.FCStd', 'synthetic-wall.step', 'synthetic-page.pdf', 'synthetic-page.svg'):
+    require((root / name).is_file() and (root / name).stat().st_size > 100, 'Missing or empty ' + name)
+require(ET.parse(root / 'synthetic-page.svg').getroot().tag.endswith('svg'), 'Invalid SVG')
+result = pdf_measurements(root / 'synthetic-page.pdf', 1000)
+(root / 'initial-pdf-check.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+print('SYNTHETIC CAD PASS: solid/cut volume, FCStd, STEP, A3 PDF and bounded vector scales')
+print('Visual review, linked dimensions, sections, DXF and full SPDS remain separate checks.')

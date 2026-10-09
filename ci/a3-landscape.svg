@@ -5,9 +5,12 @@
     <path d="M10,252 H410 M10,269 H410 M290,252 V287"/>
   </g>
   <g font-family="DejaVu Sans" fill="#000000">
-    <text x="17" y="261" font-size="5">DOM / FreeCAD synthetic QA</text>
-    <text x="17" y="279" font-size="3.8">SYNTHETIC - NOT FOR CONSTRUCTION</text>
-    <text x="296" y="261" font-size="4">A3 - top / elevation</text>
-    <text x="296" y="279" font-size="3.5">No real house data</text>
+    <text x="17" y="28" font-size="6">Контроль CAD: синтетическая стена</text>
+    <text x="70" y="64" font-size="4">Фасад (1:20)</text>
+    <text x="312" y="64" font-size="4">Вид сверху (1:50)</text>
+    <text x="17" y="261" font-size="5">DOM / FreeCAD 1.1.4 / Skill 0.13.0</text>
+    <text x="17" y="279" font-size="3.8">Синтетические данные. Не проект дома.</text>
+    <text x="296" y="261" font-size="3.4">НЕ ДЛЯ СТРОИТЕЛЬСТВА</text>
+    <text x="296" y="279" font-size="3.5">A3 / Native CAD test</text>
   </g>
 </svg>

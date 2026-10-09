@@ -1,0 +1,13 @@
+{
+  "skill": "architect-engineer-spds",
+  "upstream_version": "0.13.0",
+  "source_archive_sha256": "ac7a5c750a14d653f17f0aba0d53b7cf6d831b33646188196099a8ba41eb6af1",
+  "scope": "Reviewed native CAD and backup subset, not the complete host skill. No private project data. Full host skill has a separate regression suite.",
+  "files": {
+    "scripts/native_layers.py": "1a6c52b88a38beb532aa6a7c3fcff9ddf1fade7e64f57e31c16e41fdffb66a6c",
+    "scripts/native_audit.py": "51adee30779add7d0d0fc292ef7bad1197bca9a294924ea2dfb267dba1491338",
+    "scripts/release_backup.py": "09e805edbc2913792448eb1a44c400b566340f465d2babf6f17186fe35624102",
+    "tests/native_layers_test.py": "0c9edc364b68520c162abce2ef062bcaa2504327359c23297d710bb5b0cc3ca7",
+    "tests/test_release_backup.py": "316334a6d5f2168bdfd0792eb5da7d05f982224b3f8209ab32fdb9e924ca5b48"
+  }
+}
