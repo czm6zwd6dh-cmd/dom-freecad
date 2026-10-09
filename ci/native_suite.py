@@ -56,6 +56,13 @@ def export_page(doc, destination):
         view.touch()
     page.touch()
     doc.recompute()
+    # RedrawPage explicitly overrides Update-with-3D and page-override settings;
+    # KeepUpdated/touch/requestPaint alone can retain cached restored geometry.
+    Gui.activateWorkbench('TechDrawWorkbench')
+    require('TechDraw_RedrawPage' in Gui.listCommands(), 'Missing native redraw command')
+    Gui.Selection.clearSelection()
+    Gui.Selection.addSelection(page)
+    Gui.runCommand('TechDraw_RedrawPage', 0)
     loop = QtCore.QEventLoop()
     QtCore.QTimer.singleShot(1500, loop.quit)
     loop.exec_()
