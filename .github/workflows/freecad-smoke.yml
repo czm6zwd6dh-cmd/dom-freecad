@@ -1,0 +1,71 @@
+name: FreeCAD 1.1.4 native synthetic smoke
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freecad-synthetic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-freecad:
+    name: FreeCAD native wall / TechDraw / exports
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out reviewed public code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Install GUI and verification dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            xvfb xauth libegl1 libgl1 libglu1-mesa libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 \
+            libsm6 libice6 libxrender1 libfontconfig1 fonts-dejavu-core
+          python -m pip install 'PyMuPDF==1.26.7'
+      - name: Download and SHA-256-verify FreeCAD official binary
+        run: python ci/install_freecad.py
+      - name: Build native synthetic wall and export A3
+        env:
+          DOM_REPO_ROOT: ${{ github.workspace }}
+          QT_QPA_PLATFORM: xcb
+          QT_OPENGL: software
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          mkdir -p build/smoke
+          xvfb-run -a -s '-screen 0 1600x1200x24' \
+            timeout --signal=TERM --kill-after=10s 240 \
+            .runtime/freecad/squashfs-root/AppRun \
+              --user-cfg "$RUNNER_TEMP/dom-freecad-user.cfg" \
+              --system-cfg "$RUNNER_TEMP/dom-freecad-system.cfg" \
+              "$GITHUB_WORKSPACE/ci/smoke.FCMacro" \
+            > build/smoke/freecad.log 2>&1
+          test -s build/smoke/report.json
+      - name: Independently validate CAD files and PDF geometry
+        run: python ci/check_smoke.py build/smoke
+      - name: Explain test scope
+        if: success()
+        run: |
+          echo '### Synthetic FreeCAD test succeeded' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Verified: one synthetic wall with door opening, FCStd reopen, STEP, A3 PDF and SVG.' >> "$GITHUB_STEP_SUMMARY"
+          echo '**Not verified:** R1, dimension associativity, complete plans, SPDS compliance, or construction suitability.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Save ONLY synthetic CAD evidence and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: freecad-synthetic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/smoke/
+          retention-days: 3
+          if-no-files-found: warn
