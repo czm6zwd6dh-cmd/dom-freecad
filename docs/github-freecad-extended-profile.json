@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "profile_revision": "2026-10-09-native-lifecycle-1",
+  "repository": "czm6zwd6dh-cmd/dom-freecad",
+  "visibility_at_review": "public",
+  "reviewed_commit": "543e3cad7edb7ee758bfbdfa807fb0462c0d41ad",
+  "workflow_path": ".github/workflows/freecad-smoke.yml",
+  "workflow_id": 379890258,
+  "job_name": "FreeCAD native wall / TechDraw / exports",
+  "artifact_prefix": "freecad-synthetic",
+  "required_steps": [
+    "Check out reviewed public code",
+    "Verify repository contains no unreviewed private files",
+    "Python 3.11",
+    "Install GUI and verification dependencies",
+    "Verify updated skill subset and run regression tests",
+    "Download and SHA-256-verify FreeCAD official binary",
+    "Build native synthetic wall and export A3",
+    "Independently validate CAD files and PDF geometry",
+    "Qualify updated skill native layer and void tools",
+    "Reopen saved model in a separate FreeCAD process",
+    "Change only a disposable model copy and reexport",
+    "Verify synthetic closed-release backup and restore",
+    "Reopen restored model in a separate FreeCAD process",
+    "Package reviewed public source snapshot",
+    "Verify process isolation, unchanged source and PDF control spans",
+    "Explain test scope",
+    "Save ONLY synthetic CAD evidence and logs"
+  ],
+  "runtime": {
+    "version": "1.1.4",
+    "platform": "linux-x86_64",
+    "asset_name": "FreeCAD_1.1.4-Linux-x86_64-py311.AppImage",
+    "url": "https://github.com/FreeCAD/FreeCAD/releases/download/1.1.4/FreeCAD_1.1.4-Linux-x86_64-py311.AppImage",
+    "sha256": "f6dc6ba676e5ac96a565ebc8d657232f94c6158e85b4352141bd1a46f6b43434",
+    "size_bytes": 820812280,
+    "source": "https://github.com/FreeCAD/FreeCAD/releases/tag/1.1.4"
+  },
+  "runner": "ubuntu-24.04",
+  "retention_days_at_review": 3,
+  "private_project_input": "FORBIDDEN",
+  "scope": "Expanded public synthetic CAD lifecycle; five native processes. Use with the host skill github_freecad.py --profile. Requires current API verification. Not a private R1 route."
+}

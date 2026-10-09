@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "status": "PUBLIC_SYNTHETIC_CAD_SETUP_QUALIFIED",
+  "repository": "czm6zwd6dh-cmd/dom-freecad",
+  "qualified_commit": "543e3cad7edb7ee758bfbdfa807fb0462c0d41ad",
+  "qualified_source_tree": "caa94ab8effbeaa07f5f67000bf1ca3a9c8f3090",
+  "run_id": 37982497823,
+  "run_attempt": 1,
+  "job_id": 113996234710,
+  "run_url": "https://github.com/czm6zwd6dh-cmd/dom-freecad/actions/runs/37982497823",
+  "artifact": {
+    "id": 11641134569,
+    "name": "freecad-synthetic-37982497823-1",
+    "size_in_bytes": 1015166,
+    "sha256": "712fcc3104facf2b1fa76a9c1cf97b404d0942def76d5121d9c1f6a4238e68b4",
+    "expires_at": "2026-10-12T19:47:33Z",
+    "downloaded_byte_identity": "VERIFIED"
+  },
+  "runtime": "FreeCAD 1.1.4 / ubuntu-24.04 / Xvfb",
+  "host_skill_version": "0.13.0",
+  "cloud_skill_scope": "Reviewed native layers, void probes, byte backup modules and tests; not the full host skill",
+  "host_python_regression_tests": 182,
+  "cloud_python_regression_tests": 30,
+  "native_processes": 5,
+  "post_download_validation": "Pinned validator reproduced the original qualification.json; additional dark-stroke vector check also passed",
+  "visual_review": {
+    "method": "PDFs rendered with render_pdf.py at 150 dpi and all four pages individually inspected",
+    "pages": ["synthetic-page.pdf", "cold/synthetic-page.pdf", "mutated/synthetic-page.pdf", "restored-proof/synthetic-page.pdf"],
+    "result": "Readable Cyrillic, no observed clipping or overlaps; changed window visibly wider; original/restored geometry retained",
+    "limitations": "Synthetic test sheet, gray background, outlined non-searchable text; not a production SPDS sheet"
+  },
+  "original_model_sha256": "3e92c6d5f2eb2cc79897b68374aad52f09072c47c5062f97603b47815f638385",
+  "window_change_mm": [1000, 1200],
+  "pdf_window_width_mm_at_1_to_20": [49.998218621148, 59.99786665174696],
+  "private_project_route": "NOT_CONFIGURED",
+  "real_R1_data_published_or_processed": false,
+  "linked_dimensions_and_sections": "NOT_QUALIFIED",
+  "DXF": "NOT_QUALIFIED",
+  "full_SPDS": "NOT_QUALIFIED",
+  "construction_ready": false,
+  "scope": "Historical acceptance of the exact qualified commit and run. Re-read live HEAD and API before continuing; this file does not certify later commits or perpetual artifact retention."
+}
