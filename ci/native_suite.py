@@ -43,36 +43,57 @@ def inspect_wall(doc, opening_width):
 def export_page(doc, destination):
     import FreeCADGui as Gui
     import TechDrawGui
+    import json
+    from PySide import QtCore
+
+    def pump(milliseconds):
+        loop = QtCore.QEventLoop()
+        QtCore.QTimer.singleShot(milliseconds, loop.quit)
+        loop.exec_()
+        Gui.updateGui()
+
     destination.mkdir(parents=True, exist_ok=True)
     page = doc.getObject('A3Sheet')
     require(page is not None, 'Missing native drawing page')
-    # Restored TechDraw views may still expose their cached drawing. Mark the
-    # native views dirty, recompute, and process the queued GUI/HLR completion
-    # before export. The independent PDF test remains the acceptance condition.
-    from PySide import QtCore
     page.KeepUpdated = True
     Gui.activeDocument().getObject(page.Name).show()
-    for view in page.Views:
-        view.touch()
+    # Allow the restoration-time projection/GUI work to finish before forcing
+    # a new projection. Preserve the actual view objects and their identities.
+    pump(1500)
+    original_views = list(page.Views)
+    original_sources = [(view, list(view.Source)) for view in original_views]
+    try:
+        for view, sources in original_sources:
+            require(sources, 'Empty reviewed view source')
+            view.Source = []
+        doc.recompute()
+        pump(300)
+    finally:
+        for view, sources in original_sources:
+            view.Source = sources
+            view.touch()
     page.touch()
     doc.recompute()
-    # RedrawPage explicitly overrides Update-with-3D and page-override settings;
-    # KeepUpdated/touch/requestPaint alone can retain cached restored geometry.
     Gui.activateWorkbench('TechDrawWorkbench')
     require('TechDraw_RedrawPage' in Gui.listCommands(), 'Missing native redraw command')
     Gui.Selection.clearSelection()
     Gui.Selection.addSelection(page)
     Gui.runCommand('TechDraw_RedrawPage', 0)
-    loop = QtCore.QEventLoop()
-    QtCore.QTimer.singleShot(1500, loop.quit)
-    loop.exec_()
+    pump(1500)
     for view in page.Views:
         view.requestPaint()
-    Gui.updateGui()
-    settle = QtCore.QEventLoop()
-    QtCore.QTimer.singleShot(500, settle.quit)
-    settle.exec_()
-    Gui.updateGui()
+    pump(500)
+    require(list(page.Views) == original_views, 'View identities changed during refresh')
+    for view, sources in original_sources:
+        require(list(view.Source) == sources, 'View source links not restored')
+    diagnostic = []
+    for view in page.Views:
+        edges = view.getVisibleEdges()
+        diagnostic.append({'view': view.Name, 'scale': view.Scale,
+                           'source_volumes_mm3': [o.Shape.Volume for o in view.Source],
+                           'visible_edges': [[[v.Point.x, v.Point.y, v.Point.z]
+                                              for v in edge.Vertexes] for edge in edges]})
+    (destination / 'native-view-geometry.json').write_text(json.dumps(diagnostic, indent=2))
     TechDrawGui.exportPageAsPdf(page, str(destination / 'synthetic-page.pdf'))
     TechDrawGui.exportPageAsSvg(page, str(destination / 'synthetic-page.svg'))
 
